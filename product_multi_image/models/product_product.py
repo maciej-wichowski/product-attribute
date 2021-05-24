@@ -17,28 +17,32 @@ class ProductProduct(models.Model):
 
     # image, image_medium, image_small fields are not available since 13.0
 
+    def _filter_image(self):
+        self.ensure_one()
+        images = self.product_tmpl_id.image_ids.filtered(
+            lambda x: (
+                not x.product_variant_ids or self.id in x.product_variant_ids.ids
+            )
+        )
+        return images
+
     @api.depends(
+        "image_1920",
         "product_tmpl_id",
         "product_tmpl_id.image_ids",
         "product_tmpl_id.image_ids.product_variant_ids",
     )
     def _compute_image_ids(self):
         for product in self:
-            images = product.product_tmpl_id.image_ids.filtered(
-                lambda x: (
-                    not x.product_variant_ids or product.id in x.product_variant_ids.ids
-                )
-            )
+            images = self._filter_image()
             product.image_ids = [(6, 0, images.ids)]
+            product._compute_image_1920()
+            # product.image_1920 = images[0].image_1920
 
     def _inverse_image_ids(self):
         for product in self:
             # Remember the list of images that were before changes
-            previous_images = product.product_tmpl_id.image_ids.filtered(
-                lambda x: (
-                    not x.product_variant_ids or product.id in x.product_variant_ids.ids
-                )
-            )
+            previous_images = self._filter_image()
             for image in product.image_ids:
                 if isinstance(image.id, models.NewId):
                     # Image added
@@ -64,8 +68,28 @@ class ProductProduct(models.Model):
                     # Leave the images for the rest of the variants
                     image.product_variant_ids = [(6, 0, variants.ids)]
             product.image_1920 = (
-                False if len(product.image_ids) < 1 else product.image_ids[0].image_main
+                False if len(product.image_ids) < 1 else product.image_ids[0].image_1920
             )
+
+    def _set_image_1920(self):
+        for product in self:
+            image = product.image_1920
+            if not product.product_tmpl_id.image_1920:
+                product.product_tmpl_id.image_1920 = image
+            has_images = bool(product.image_ids)
+            if image:
+                write_vals = {
+                    "file_db_store": image,
+                    "storage": "db",
+                }
+                if has_images:
+                    product.image_ids[0].write(write_vals)
+                else:
+                    product.image_ids = [(0, False, write_vals)]
+            else:
+                if has_images:
+                    product.image_ids = [(3, product.image_ids[0].id)]
+        super()._set_image_1920()
 
     def unlink(self):
         obj = self.with_context(bypass_image_removal=True)

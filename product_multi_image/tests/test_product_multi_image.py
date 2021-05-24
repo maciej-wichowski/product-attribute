@@ -73,6 +73,9 @@ class TestProductMultiImage(common.TransactionCase):
                 ],
             }
         )
+        images = self.product_template.image_ids
+        for i in images:
+            i._compute_image()
         self.product_1 = self.product_template.product_variant_ids[0]
         self.product_2 = self.product_template.product_variant_ids[1]
 
@@ -85,6 +88,7 @@ class TestProductMultiImage(common.TransactionCase):
         self.product_template.image_ids[0].product_variant_ids = [
             (6, 0, self.product_1.ids)
         ]
+        self.product_template.refresh()
         self.assertEqual(len(self.product_1.image_ids), 2)
         self.assertEqual(len(self.product_2.image_ids), 1)
         self.assertEqual(self.product_1.image_1920, self.transparent_image)
@@ -119,6 +123,19 @@ class TestProductMultiImage(common.TransactionCase):
         self.product_1.image_ids[0].name = text
         self.product_template.refresh()
         self.assertEqual(self.product_template.image_ids[0].name, text)
+
+    def test_edit_image_1920(self):
+        self.product_1.image_1920 = self.grey_image
+        self.product_template.refresh()
+        self.assertEqual(self.product_1.image_ids[0].image_1920, self.grey_image)
+        self.assertEqual(self.product_template.image_ids[0].image_1920, self.grey_image)
+
+    def test_remove_image_1920(self):
+        self.product_1.image_1920 = False
+        self.assertEqual(len(self.product_1.image_ids), 1)
+        self.assertEqual(
+            self.product_template.image_ids[0].product_variant_ids, self.product_2
+        )
 
     def test_create_variant_afterwards(self):
         """Create a template, assign an image, and then create the variant.

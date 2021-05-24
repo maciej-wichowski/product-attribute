@@ -1,0 +1,1 @@
+odoo14-addon-base-multi-image @ git+https://github.com/hailangvn/server-tools@wip/image_mixin#subdirectory=setup/base_multi_image
